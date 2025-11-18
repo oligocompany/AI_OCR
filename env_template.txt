@@ -1,0 +1,23 @@
+# 이 파일을 .env 로 이름을 변경하고 실제 API 키를 입력하세요
+
+# OpenAI API 키 (GPT-4 Vision 사용 시)
+# https://platform.openai.com/api-keys 에서 발급
+OPENAI_API_KEY=sk-your-api-key-here
+
+# Google Cloud Vision API (Google Vision 사용 시)
+# Google Cloud Console에서 서비스 계정 생성 후 JSON 파일 다운로드
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/credentials.json
+
+# Naver Clova OCR (Naver Clova 사용 시)
+# https://www.ncloud.com/product/aiService/ocr 에서 신청
+NAVER_OCR_SECRET_KEY=your-naver-secret-key
+NAVER_OCR_API_URL=https://your-api-url.apigw.ntruss.com/custom/v1/00000/your-domain
+
+
+
+
+
+
+
+
+
