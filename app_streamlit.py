@@ -61,7 +61,7 @@ def main():
     # OCR 방법 선택 (GPT-4 Vision을 기본값으로 설정)
     ocr_method = st.sidebar.selectbox(
         "OCR 엔진 선택",
-        options=["gpt4_vision", "naver_clova", "google_vision"],
+        options=["gpt4_vision", "naver_clova", "google_vision", "pp_ocrv5"],
         index=0,
         help="GPT-4 Vision이 가장 높은 인식률을 제공합니다."
     )
@@ -70,7 +70,8 @@ def main():
     method_info = {
         "gpt4_vision": "✨ **GPT-4 Vision** (기본, 추천) ✅\n- 가장 높은 인식률\n- 한글 손글씨 특화\n- 상품명과 가격 정확 분류\n- OpenAI API 키 필요",
         "naver_clova": "🇰🇷 **Naver Clova OCR**\n- 한국어 및 한글 손글씨에 특화\n- 월 1,000건 무료 제공\n- 국내 서버로 빠른 응답\n- ASCII 인코딩 문제 없음",
-        "google_vision": "🔍 **Google Cloud Vision**\n- 높은 정확도\n- 월 1,000건 무료\n- GCP 인증 필요"
+        "google_vision": "🔍 **Google Cloud Vision**\n- 높은 정확도\n- 월 1,000건 무료\n- GCP 인증 필요",
+        "pp_ocrv5": "🚀 **PP-OCRv5** (다섯 번째 엔진) ✅\n- 한국어 특화 모델 (88% 정확도)\n- 로컬 실행 (API 비용 없음)\n- 오프라인 사용 가능\n- PaddleOCR 라이브러리 필요"
     }
     
     st.sidebar.info(method_info[ocr_method])
@@ -111,6 +112,21 @@ def main():
         else:
             st.sidebar.error("❌ Google Cloud 인증이 설정되지 않았습니다.")
             st.sidebar.info("`.env` 파일에 `GOOGLE_APPLICATION_CREDENTIALS`를 추가하세요.")
+    
+    elif ocr_method == "pp_ocrv5":
+        # PP-OCRv5는 라이브러리 설치만 확인
+        try:
+            import paddleocr
+            st.sidebar.success("✅ PP-OCRv5 라이브러리 확인됨")
+        except ImportError:
+            st.sidebar.warning("⚠️ PaddleOCR이 설치되지 않았습니다.")
+            st.sidebar.info("설치 방법: `pip install paddleocr paddlepaddle`")
+            st.sidebar.markdown("""
+            **설정 방법:**
+            1. 터미널에서 `pip install paddleocr paddlepaddle` 실행
+            2. 첫 실행 시 모델이 자동으로 다운로드됩니다
+            3. 한국어 모델 사용 (기본값)
+            """)
     
     # 메인 영역 - 이미지 업로드
     st.header("1️⃣ 이미지 업로드")
@@ -289,6 +305,7 @@ def main():
         - GPT-4 Vision: 5-10초
         - Google Vision: 2-5초
         - Naver Clova: 3-7초
+        - PP-OCRv5: 2-5초 (첫 실행 시 모델 로드 시간 추가)
         """)
     
     # 푸터

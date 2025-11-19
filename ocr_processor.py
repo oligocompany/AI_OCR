@@ -35,9 +35,11 @@ class MarketOCRProcessor:
                 - "gpt4_vision": OpenAI GPT-4 Vision (추천, 가장 정확)
                 - "google_vision": Google Cloud Vision API
                 - "naver_clova": Naver Clova OCR
+                - "pp_ocrv5": PaddleOCR PP-OCRv5 (한국어 특화, 로컬 실행)
         """
         self.method = method
         self.api_key = None
+        self.pp_ocr_ocr = None  # PP-OCRv5 OCR 객체 (지연 로딩)
         
         # 선택한 방법에 따라 API 키 확인
         if method == "gpt4_vision":
@@ -55,6 +57,13 @@ class MarketOCRProcessor:
             self.naver_url = os.getenv("NAVER_OCR_API_URL")
             if not self.naver_secret or not self.naver_url:
                 raise ValueError("Naver Clova OCR 설정이 완료되지 않았습니다.")
+        
+        elif method == "pp_ocrv5":
+            # PP-OCRv5는 지연 로딩 (처음 사용할 때 모델 로드)
+            # 모델 경로 설정 (선택사항, 기본값은 자동 다운로드)
+            self.pp_ocrv5_model_path = os.getenv("PP_OCRV5_MODEL_PATH", None)
+            # 한국어 모델 사용 여부 설정
+            self.pp_ocrv5_use_korean = os.getenv("PP_OCRV5_USE_KOREAN", "True").lower() == "true"
     
     
     def preprocess_image(self, image_path: str) -> np.ndarray:
@@ -443,6 +452,178 @@ Output format:
             }
     
     
+    def _load_pp_ocrv5_model(self):
+        """
+        PP-OCRv5 모델 로드 (지연 로딩)
+        처음 사용할 때만 모델을 로드하여 메모리 효율성 향상
+        """
+        if self.pp_ocr_ocr is None:
+            try:
+                from paddleocr import PaddleOCR
+                import paddle
+                
+                # GPU 사용 가능 여부 확인
+                gpu_available = False
+                gpu_device = "CPU"
+                try:
+                    # PaddlePaddle이 CUDA를 지원하는지 확인
+                    if paddle.device.is_compiled_with_cuda():
+                        # GPU가 사용 가능한지 확인
+                        if paddle.device.cuda.device_count() > 0:
+                            gpu_available = True
+                            gpu_device = f"GPU (CUDA {paddle.device.cuda.device_count()}개)"
+                            print(f"🚀 GPU 감지됨: {gpu_device}")
+                        else:
+                            print("⚠️ CUDA는 지원되지만 사용 가능한 GPU가 없습니다. CPU 사용.")
+                    else:
+                        print("ℹ️ CUDA가 지원되지 않는 빌드입니다. CPU 사용.")
+                except Exception as e:
+                    print(f"⚠️ GPU 확인 중 오류: {e}. CPU 사용.")
+                
+                # 한국어 모델 사용 여부에 따라 설정
+                if self.pp_ocrv5_use_korean:
+                    # 한국어 특화 모델 사용
+                    # lang='korean': 한국어 모델 사용 (korean_PP-OCRv5_mobile_rec)
+                    # use_doc_orientation_classify: 문서 방향 분류 사용 (성능 향상)
+                    # use_textline_orientation: 텍스트 라인 방향 감지 사용 (성능 향상)
+                    # text_rec_score_thresh: 텍스트 인식 신뢰도 임계값 (낮을수록 더 많은 텍스트 인식)
+                    self.pp_ocr_ocr = PaddleOCR(
+                        lang='korean',  # 한국어 모델
+                        use_doc_orientation_classify=True,  # 문서 방향 분류 활성화 (성능 향상)
+                        use_textline_orientation=True,  # 텍스트 라인 방향 감지 활성화 (성능 향상)
+                        text_rec_score_thresh=0.5,  # 텍스트 인식 신뢰도 임계값 (0.5 = 50% 이상)
+                        ocr_version='PP-OCRv5'  # PP-OCRv5 버전 명시
+                    )
+                else:
+                    # 기본 다국어 모델 사용
+                    self.pp_ocr_ocr = PaddleOCR(
+                        lang='ch',  # 중국어/영어 기본 모델 (한국어도 지원)
+                        use_doc_orientation_classify=True,
+                        use_textline_orientation=True,
+                        text_rec_score_thresh=0.5,
+                        ocr_version='PP-OCRv5'
+                    )
+                
+                # GPU 사용 정보 저장 (결과에 포함하기 위해)
+                self.pp_ocr_gpu_info = {
+                    "gpu_available": gpu_available,
+                    "gpu_device": gpu_device,
+                    "using_gpu": gpu_available  # PaddleOCR은 자동으로 GPU 사용
+                }
+                
+                print(f"✅ PP-OCRv5 모델 로드 완료 ({gpu_device})")
+                
+            except ImportError:
+                raise ImportError(
+                    "PaddleOCR이 설치되지 않았습니다. "
+                    "설치하려면: pip install paddleocr paddlepaddle"
+                )
+            except Exception as e:
+                raise Exception(f"PP-OCRv5 모델 로드 실패: {str(e)}")
+        
+        return self.pp_ocr_ocr
+    
+    
+    def process_with_pp_ocrv5(self, image_path: str) -> Dict:
+        """
+        PP-OCRv5 모델을 사용한 OCR 처리
+        한국어에 특화된 PaddleOCR의 최신 모델 사용
+        
+        Args:
+            image_path: 이미지 파일 경로
+            
+        Returns:
+            인식된 상품 정보 딕셔너리
+        """
+        try:
+            # PP-OCRv5 모델 로드 (지연 로딩)
+            ocr = self._load_pp_ocrv5_model()
+            
+            # 이미지 파일 읽기 (한글 경로 대응)
+            # PaddleOCR은 파일 경로를 직접 받을 수 있지만, 
+            # 한글 경로 문제를 방지하기 위해 numpy array로 변환
+            image = cv2.imread(image_path)
+            if image is None:
+                raise ValueError(f"이미지를 불러올 수 없습니다: {image_path}")
+            
+            # OCR 수행
+            # PaddleOCR 3.3.2에서는 result[0]이 OCRResult 객체
+            result = ocr.ocr(image)
+            
+            # 결과 파싱
+            full_text = ""
+            text_lines = []
+            
+            if result and len(result) > 0:
+                ocr_result = result[0]
+                
+                # OCRResult 객체는 딕셔너리처럼 동작
+                # rec_texts: 인식된 텍스트 리스트
+                # rec_scores: 각 텍스트의 신뢰도 리스트
+                # get() 메서드를 사용하여 안전하게 접근
+                texts = ocr_result.get('rec_texts', []) or []
+                scores = ocr_result.get('rec_scores', []) or []
+                
+                # 텍스트와 신뢰도를 매칭
+                if texts:
+                    for i, text in enumerate(texts):
+                        if text and isinstance(text, str):
+                            confidence = scores[i] if i < len(scores) else 0.0
+                            full_text += text + "\n"
+                            text_lines.append({
+                                "text": text,
+                                "confidence": float(confidence)
+                            })
+            
+            # 텍스트가 없으면 오류 반환
+            if not full_text.strip():
+                return {
+                    "products": [],
+                    "raw_text": "",
+                    "error": "텍스트를 인식할 수 없습니다.",
+                    "message": "이미지에서 텍스트를 찾을 수 없습니다."
+                }
+            
+            # 상품 정보 파싱
+            products = self._parse_text_to_products(full_text)
+            
+            # GPU 사용 정보 가져오기 (모델이 로드된 경우)
+            gpu_info = getattr(self, 'pp_ocr_gpu_info', {
+                "gpu_available": False,
+                "gpu_device": "CPU",
+                "using_gpu": False
+            })
+            
+            # 결과 구성
+            result_dict = {
+                "products": products,
+                "raw_text": full_text.strip(),
+                "text_lines": text_lines,  # 각 라인별 상세 정보
+                "metadata": {
+                    "method": "pp_ocrv5",
+                    "timestamp": datetime.now().isoformat(),
+                    "image_path": image_path,
+                    "total_items": len(products),
+                    "total_text_lines": len(text_lines),
+                    "korean_model": self.pp_ocrv5_use_korean,
+                    "gpu_info": gpu_info  # GPU 사용 정보 추가
+                }
+            }
+            
+            return result_dict
+            
+        except ImportError as e:
+            return {
+                "error": f"PaddleOCR 라이브러리 오류: {str(e)}",
+                "message": "PaddleOCR이 설치되지 않았습니다. pip install paddleocr paddlepaddle로 설치하세요."
+            }
+        except Exception as e:
+            return {
+                "error": str(e),
+                "message": "PP-OCRv5 처리 중 오류가 발생했습니다."
+            }
+    
+    
     def _parse_text_to_products(self, text: str) -> List[Dict]:
         """
         추출된 텍스트에서 상품명과 가격 파싱
@@ -517,10 +698,12 @@ Output format:
             return self.process_with_google_vision(image_path)
         elif self.method == "naver_clova":
             return self.process_with_naver_clova(image_path)
+        elif self.method == "pp_ocrv5":
+            return self.process_with_pp_ocrv5(image_path)
         else:
             return {
                 "error": f"지원하지 않는 OCR 방법: {self.method}",
-                "supported_methods": ["gpt4_vision", "google_vision", "naver_clova"]
+                "supported_methods": ["gpt4_vision", "google_vision", "naver_clova", "pp_ocrv5"]
             }
     
     
@@ -550,8 +733,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--method", "-m", 
         default="gpt4_vision",
-        choices=["gpt4_vision", "google_vision", "naver_clova"],
-        help="OCR 방법 선택"
+        choices=["gpt4_vision", "google_vision", "naver_clova", "pp_ocrv5"],
+        help="OCR 방법 선택 (gpt4_vision, google_vision, naver_clova, pp_ocrv5)"
     )
     parser.add_argument("--output", "-o", default="result.json", help="결과 저장 경로")
     

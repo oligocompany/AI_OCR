@@ -169,6 +169,11 @@ HTML_TEMPLATE = """
                     <span style="font-weight: 600;">GPT-4 Vision</span>
                     <span style="margin-left: 10px; font-size: 12px; color: #666;">(고정밀 텍스트 인식)</span>
                 </label>
+                <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
+                    <input type="radio" name="ocr_engine" value="pp_ocrv5" style="margin-right: 8px;">
+                    <span style="font-weight: 600;">🚀 PP-OCRv5</span>
+                    <span style="margin-left: 10px; font-size: 12px; color: #666;">(한국어 특화, 로컬)</span>
+                </label>
                 <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif; opacity: 0.6;">
                     <input type="radio" name="ocr_engine" value="sibang_ocr" disabled style="margin-right: 8px;">
                     <span style="font-weight: 600;">🏪 Sibang OCR</span>
@@ -449,6 +454,11 @@ HTML_TEMPLATE = """
                     currentEngine.textContent = 'GPT-4 Vision';
                     engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">GPT-4 Vision</span> - 고정밀 텍스트 인식 엔진';
                     engineStatus.style.background = '#e6f3ff';
+                    document.getElementById('sibangInfo').style.display = 'none';
+                } else if (this.value === 'pp_ocrv5') {
+                    currentEngine.textContent = 'PP-OCRv5';
+                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">🚀 PP-OCRv5</span> - 한국어 특화 로컬 OCR 엔진';
+                    engineStatus.style.background = '#fff5e6';
                     document.getElementById('sibangInfo').style.display = 'none';
                 } else if (this.value === 'sibang_ocr') {
                     currentEngine.textContent = 'Sibang OCR';
@@ -798,6 +808,46 @@ def index():
                                 "type": "error",
                                 "message": f"Naver Clova OCR 오류: {str(e)}"
                             }
+                elif selected_engine == 'pp_ocrv5':
+                    try:
+                        from ocr_processor import MarketOCRProcessor
+                        processor = MarketOCRProcessor(method="pp_ocrv5")
+                        # 이미지 데이터를 임시 파일로 저장
+                        import tempfile
+                        temp_fd, temp_path = tempfile.mkstemp(suffix='.jpg')
+                        os.close(temp_fd)
+                        with open(temp_path, 'wb') as f:
+                            f.write(image_data)
+                        
+                        # OCR 처리
+                        result_dict = processor.process_image(temp_path)
+                        
+                        # 임시 파일 삭제
+                        os.unlink(temp_path)
+                        
+                        # 결과 형식 통일
+                        if "error" in result_dict:
+                            result = {
+                                "type": "error",
+                                "message": result_dict.get("error", "PP-OCRv5 처리 중 오류 발생")
+                            }
+                        else:
+                            text = result_dict.get("raw_text", "")
+                            result = {
+                                "type": "success",
+                                "message": text,
+                                "engine": "PP-OCRv5"
+                            }
+                    except ImportError:
+                        result = {
+                            "type": "error",
+                            "message": "PaddleOCR이 설치되지 않았습니다.\n\n설치 방법: pip install paddleocr paddlepaddle"
+                        }
+                    except Exception as e:
+                        result = {
+                            "type": "error",
+                            "message": f"PP-OCRv5 처리 오류: {str(e)}"
+                        }
                 elif selected_engine == 'sibang_ocr':
                     # Sibang OCR (개발 예정)
                     result = {
