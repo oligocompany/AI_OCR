@@ -352,9 +352,22 @@ Output format:
                 ]
             }
             
-            # API 호출
-            response = requests.post(url, headers=headers, json=data)
-            response.raise_for_status()
+            # API 호출 (타임아웃 설정 추가 - 연결 10초, 읽기 30초)
+            # 네트워크 연결 문제 시 빠르게 실패하도록 타임아웃 설정
+            try:
+                response = requests.post(
+                    url, 
+                    headers=headers, 
+                    json=data,
+                    timeout=(10, 30)  # 연결 타임아웃 10초, 읽기 타임아웃 30초
+                )
+                response.raise_for_status()
+            except requests.exceptions.Timeout:
+                raise Exception("네이버 Clova OCR API 서버 연결 타임아웃 (30초 초과). 네트워크 연결을 확인해주세요.")
+            except requests.exceptions.ConnectionError as e:
+                raise Exception(f"네이버 Clova OCR API 서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요. (상세: {str(e)})")
+            except requests.exceptions.RequestException as e:
+                raise Exception(f"네이버 Clova OCR API 요청 실패: {str(e)}")
             
             result_data = response.json()
             
@@ -425,9 +438,22 @@ Output format:
                 ]
             }
             
-            # API 호출
-            response = requests.post(url, headers=headers, json=data)
-            response.raise_for_status()
+            # API 호출 (타임아웃 설정 추가 - 연결 10초, 읽기 30초)
+            # 네트워크 연결 문제 시 빠르게 실패하도록 타임아웃 설정
+            try:
+                response = requests.post(
+                    url, 
+                    headers=headers, 
+                    json=data,
+                    timeout=(10, 30)  # 연결 타임아웃 10초, 읽기 타임아웃 30초
+                )
+                response.raise_for_status()
+            except requests.exceptions.Timeout:
+                raise Exception("네이버 Clova OCR API 서버 연결 타임아웃 (30초 초과). 네트워크 연결을 확인해주세요.")
+            except requests.exceptions.ConnectionError as e:
+                raise Exception(f"네이버 Clova OCR API 서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요. (상세: {str(e)})")
+            except requests.exceptions.RequestException as e:
+                raise Exception(f"네이버 Clova OCR API 요청 실패: {str(e)}")
             
             # 응답 처리
             result = response.json()

@@ -20,6 +20,7 @@ trocr>=0.1.0
 # 웹 프레임워크
 streamlit>=1.28.0
 fastapi>=0.104.0
+flask>=3.0.0  # Flask 웹 서버
 uvicorn>=0.24.0
 python-multipart>=0.0.6
 

@@ -21,3 +21,6 @@ NAVER_OCR_API_URL=https://your-api-url.apigw.ntruss.com/custom/v1/00000/your-dom
 
 
 
+
+
+

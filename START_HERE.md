@@ -87,3 +87,6 @@ python3 ocr_processor.py --image 이미지.jpg
 
 
 
+
+
+

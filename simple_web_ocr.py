@@ -14,8 +14,11 @@ from flask import Flask, request, jsonify, render_template_string
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# 환경변수 로드
-load_dotenv("sibangaiocr.env")
+# 환경변수 로드 (.env 우선, 없으면 sibangaiocr.env 사용)
+if os.path.exists(".env"):
+    load_dotenv(".env")  # .env 파일이 있으면 우선 사용
+else:
+    load_dotenv("sibangaiocr.env")  # 없으면 sibangaiocr.env 사용
 
 app = Flask(__name__, static_folder='fonts', static_url_path='/fonts')
 
@@ -155,47 +158,24 @@ HTML_TEMPLATE = """
             <h3 style="margin-top: 0; color: #333; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">🤖 OCR 엔진 선택</h3>
             <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;" id="engineOptions">
                 <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
-                    <input type="radio" name="ocr_engine" value="tesseract" checked style="margin-right: 8px;">
+                    <input type="radio" name="ocr_engine" value="tesseract" style="margin-right: 8px;">
                     <span style="font-weight: 600;">Tesseract OCR</span>
-                    <span style="margin-left: 10px; font-size: 12px; color: #666;">(고급처리)</span>
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
-                    <input type="radio" name="ocr_engine" value="naver_clova" style="margin-right: 8px;">
+                    <input type="radio" name="ocr_engine" value="naver_clova" checked style="margin-right: 8px;">
                     <span style="font-weight: 600;">Naver Clova OCR</span>
-                    <span style="margin-left: 10px; font-size: 12px; color: #666;">(한글 최적화)</span>
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
                     <input type="radio" name="ocr_engine" value="gpt4_vision" style="margin-right: 8px;">
-                    <span style="font-weight: 600;">GPT-4 Vision</span>
-                    <span style="margin-left: 10px; font-size: 12px; color: #666;">(고정밀 텍스트 인식)</span>
+                    <span style="font-weight: 600;">SibangOCR (GV engine)</span>
                 </label>
                 <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
                     <input type="radio" name="ocr_engine" value="pp_ocrv5" style="margin-right: 8px;">
-                    <span style="font-weight: 600;">🚀 PP-OCRv5</span>
-                    <span style="margin-left: 10px; font-size: 12px; color: #666;">(한국어 특화, 로컬)</span>
-                </label>
-                <label style="display: flex; align-items: center; cursor: pointer; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif; opacity: 0.6;">
-                    <input type="radio" name="ocr_engine" value="sibang_ocr" disabled style="margin-right: 8px;">
-                    <span style="font-weight: 600;">🏪 Sibang OCR</span>
-                    <span style="margin-left: 10px; font-size: 12px; color: #666;">(전통시장 전용)</span>
+                    <span style="font-weight: 600;">🏪 Sibang OCR (PP_전통시장용)</span>
                 </label>
             </div>
-            <div id="engineStatus" style="margin-top: 10px; padding: 10px; background: #f0f8ff; border-radius: 5px; font-size: 14px; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
-                <strong>현재 선택:</strong> <span id="currentEngine">Tesseract OCR</span> - 고급처리 엔진
-            </div>
-            
-            <!-- Sibang OCR 개발 예정 안내 -->
-            <div id="sibangInfo" style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107; display: none;">
-                <h4 style="margin-top: 0; color: #856404; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">🚧 Sibang OCR 개발 중</h4>
-                <ul style="margin: 10px 0; padding-left: 20px; color: #856404; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
-                    <li>전통시장 가격표 특화 인식</li>
-                    <li>한글 필기체 최적화</li>
-                    <li>상품명 및 가격 자동 추출</li>
-                    <li>시장 특화 용어 사전</li>
-                </ul>
-                <p style="margin: 10px 0 0 0; font-size: 12px; color: #6c757d; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
-                    💡 전통시장에 최적화된 OCR 엔진으로 개발 중입니다.
-                </p>
+            <div id="engineStatus" style="margin-top: 10px; padding: 10px; background: #e6fff2; border-radius: 5px; font-size: 14px; font-family: 'Paperlogy', 'Malgun Gothic', sans-serif;">
+                <strong>현재 선택:</strong> <span id="currentEngine">Naver Clova OCR</span> - 한글 최적화 엔진 ⭐ 추천
             </div>
         </div>
         
@@ -447,30 +427,18 @@ HTML_TEMPLATE = """
                     document.getElementById('sibangInfo').style.display = 'none';
                 } else if (this.value === 'naver_clova') {
                     currentEngine.textContent = 'Naver Clova OCR';
-                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">Naver Clova OCR</span> - 한글 최적화 엔진';
+                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">Naver Clova OCR</span> - 한글 최적화 엔진 ⭐ 추천';
                     engineStatus.style.background = '#e6fff2';
                     document.getElementById('sibangInfo').style.display = 'none';
                 } else if (this.value === 'gpt4_vision') {
-                    currentEngine.textContent = 'GPT-4 Vision';
-                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">GPT-4 Vision</span> - 고정밀 텍스트 인식 엔진';
+                    currentEngine.textContent = 'SibangOCR (GV engine)';
+                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">SibangOCR (GV engine)</span> - 고정밀 텍스트 인식 엔진';
                     engineStatus.style.background = '#e6f3ff';
                     document.getElementById('sibangInfo').style.display = 'none';
                 } else if (this.value === 'pp_ocrv5') {
-                    currentEngine.textContent = 'PP-OCRv5';
-                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">🚀 PP-OCRv5</span> - 한국어 특화 로컬 OCR 엔진';
+                    currentEngine.textContent = 'Sibang OCR (PP_전통시장용)';
+                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">🏪 Sibang OCR (PP_전통시장용)</span> - 한국어 특화 로컬 OCR 엔진';
                     engineStatus.style.background = '#fff5e6';
-                    document.getElementById('sibangInfo').style.display = 'none';
-                } else if (this.value === 'sibang_ocr') {
-                    currentEngine.textContent = 'Sibang OCR';
-                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">🏪 Sibang OCR</span> - 전통시장 전용 엔진<br><small style="color: #dc3545;">⚠️ 아직 개발 중입니다. 다른 엔진을 선택해주세요.</small>';
-                    engineStatus.style.background = '#fff3cd';
-                    engineStatus.style.borderLeft = '4px solid #ffc107';
-                    
-                    // Sibang OCR 정보 표시
-                    document.getElementById('sibangInfo').style.display = 'block';
-                } else {
-                    // Sibang OCR이 아닌 경우 정보 숨기기
-                    document.getElementById('sibangInfo').style.display = 'none';
                 }
             });
         });
@@ -657,7 +625,7 @@ def index():
             })
         
         try:
-            # 선택된 OCR 엔진 확인
+            # 선택된 OCR 엔진 확인 (기본값: naver_clova - 추천 첫번째 방법)
             selected_engine = request.form.get('ocr_engine', 'naver_clova')
             
             # 안전한 이미지 처리
@@ -788,10 +756,42 @@ def index():
                 elif selected_engine == 'naver_clova':
                     try:
                         from ocr_processor import MarketOCRProcessor
+                        import os
+                        from dotenv import load_dotenv
+                        
+                        # 환경 변수 다시 로드 (ocr_processor와 동일하게)
+                        if os.path.exists(".env"):
+                            load_dotenv(".env", override=True)  # override=True로 덮어쓰기
+                        load_dotenv("sibangaiocr.env", override=True)  # sibangaiocr.env도 로드
+                        
+                        # API 키 확인
+                        naver_secret = os.getenv("NAVER_OCR_SECRET_KEY")
+                        naver_url = os.getenv("NAVER_OCR_API_URL")
+                        
+                        if not naver_secret or not naver_url:
+                            raise ValueError(
+                                "Naver Clova OCR 설정이 완료되지 않았습니다.\n\n"
+                                "확인사항:\n"
+                                "1. sibangaiocr.env 파일에 NAVER_OCR_SECRET_KEY가 설정되어 있는지 확인\n"
+                                "2. sibangaiocr.env 파일에 NAVER_OCR_API_URL이 설정되어 있는지 확인\n"
+                                "3. 환경 변수 파일이 올바른 위치에 있는지 확인"
+                            )
+                        
                         processor = MarketOCRProcessor(method="naver_clova")  # naver_clova 방법으로 초기화
                         # Naver Clova OCR 처리 - 이미지 데이터를 직접 전달
                         result_dict = processor.process_with_naver_clova_from_data(image_data)
+                        
+                        # 에러 체크 (다른 엔진으로 fallback하지 않음)
+                        if "error" in result_dict:
+                            error_msg = result_dict.get("error", "알 수 없는 오류")
+                            raise Exception(f"Naver Clova OCR 처리 실패: {error_msg}")
+                        
                         text = result_dict.get('text', '') if isinstance(result_dict, dict) else str(result_dict)
+                        
+                        # 텍스트가 비어있으면 에러 처리
+                        if not text or text.strip() == "":
+                            raise Exception("텍스트를 인식할 수 없습니다. 이미지를 확인해주세요.")
+                        
                         engine_used = 'Naver Clova OCR'
                         result = {
                             "type": "success",
@@ -799,15 +799,18 @@ def index():
                             "engine": engine_used
                         }
                     except Exception as e:
-                        # Naver Clova 실패 시 GPT-4 Vision으로 fallback
-                        result = safe_process_image(image_data)
-                        if result and result.get('type') == 'success':
-                            result['engine'] = 'GPT-4 Vision (fallback)'
-                        else:
-                            result = {
-                                "type": "error",
-                                "message": f"Naver Clova OCR 오류: {str(e)}"
-                            }
+                        # 선택한 엔진만 사용 - 다른 엔진으로 fallback하지 않음
+                        import traceback
+                        error_detail = str(e)
+                        result = {
+                            "type": "error",
+                            "message": f"❌ Naver Clova OCR 오류\n\n{error_detail}\n\n"
+                                      f"💡 해결 방법:\n"
+                                      f"1. 네이버 클라우드 플랫폼에서 API 키 확인\n"
+                                      f"2. sibangaiocr.env 파일의 NAVER_OCR_SECRET_KEY와 NAVER_OCR_API_URL 확인\n"
+                                      f"3. 네트워크 연결 상태 확인\n"
+                                      f"4. 다른 OCR 엔진을 선택해보세요"
+                        }
                 elif selected_engine == 'pp_ocrv5':
                     try:
                         from ocr_processor import MarketOCRProcessor
@@ -836,7 +839,7 @@ def index():
                             result = {
                                 "type": "success",
                                 "message": text,
-                                "engine": "PP-OCRv5"
+                                "engine": "Sibang OCR (PP_전통시장용)"
                             }
                     except ImportError:
                         result = {
@@ -848,17 +851,11 @@ def index():
                             "type": "error",
                             "message": f"PP-OCRv5 처리 오류: {str(e)}"
                         }
-                elif selected_engine == 'sibang_ocr':
-                    # Sibang OCR (개발 예정)
-                    result = {
-                        "type": "error",
-                        "message": "🏪 Sibang OCR은 아직 개발 중입니다.\n\n전통시장 특화 OCR 엔진으로 향후 개발 예정입니다.\n\n현재는 GPT-4 Vision 또는 Naver Clova OCR을 사용해주세요."
-                    }
                 else:
                     # GPT-4 Vision (기본값)
                     result = safe_process_image(image_data)
                     if result and result.get('type') == 'success':
-                        result['engine'] = 'GPT-4 Vision'
+                        result['engine'] = 'SibangOCR (GV engine)'
                         
             except Exception as e:
                 result = {
@@ -877,7 +874,18 @@ def index():
     return render_template_string(HTML_TEMPLATE)
 
 if __name__ == '__main__':
-    print("🚀 간단한 OCR 웹 서버 시작...")
-    print("📱 접속: http://localhost:8081")
-    app.run(debug=True, host='0.0.0.0', port=8081)
+    # 포트 설정 (환경변수 파일에서 읽기 - sibangaiocr.env 또는 .env)
+    # 환경변수 FLASK_PORT가 설정되어 있으면 사용, 없으면 8081 (기본값)
+    port = int(os.getenv('FLASK_PORT', 8081))
+    
+    print("=" * 60)
+    print("🚀 전통시장 AI OCR 웹 서버 시작")
+    print("=" * 60)
+    print(f"📱 접속 주소: http://localhost:{port}")
+    print(f"🔧 포트: {port} (환경변수 파일에서 고정 설정됨)")
+    print("🤖 기본 OCR 엔진: Naver Clova OCR (추천 첫번째 방법)")
+    print("=" * 60)
+    print("💡 다음에 실행할 때도 이 주소로 접속하세요: http://localhost:8081")
+    print("=" * 60)
+    app.run(debug=True, host='0.0.0.0', port=port)
 
