@@ -432,7 +432,7 @@ HTML_TEMPLATE = """
                     document.getElementById('sibangInfo').style.display = 'none';
                 } else if (this.value === 'gpt4_vision') {
                     currentEngine.textContent = 'SibangOCR (GV engine)';
-                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">SibangOCR (GV engine)</span> - 고정밀 텍스트 인식 엔진';
+                    engineStatus.innerHTML = '<strong>현재 선택:</strong> <span id="currentEngine">SibangOCR (GV engine)</span>';
                     engineStatus.style.background = '#e6f3ff';
                     document.getElementById('sibangInfo').style.display = 'none';
                 } else if (this.value === 'pp_ocrv5') {
